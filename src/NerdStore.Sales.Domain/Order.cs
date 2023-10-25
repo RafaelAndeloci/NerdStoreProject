@@ -26,7 +26,7 @@ public class Order : Entity, IAggregateRoot
     public IReadOnlyCollection<OrderItem> OrderItems => _orderItems;
 
     //EF Relation
-    public Voucher Voucher { get; private set; }
+    public Voucher? Voucher { get; private set; }
     
     public void AddItem(OrderItem item)
     {

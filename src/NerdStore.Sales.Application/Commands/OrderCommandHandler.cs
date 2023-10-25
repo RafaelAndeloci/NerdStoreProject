@@ -25,7 +25,7 @@ public class OrderCommandHandler : IRequestHandler<AddItemToOrderCommand, bool>
             order = Order.OrderFactory.NewOrderSketch(message.ClientId);
             order.AddItem(orderItem);
             
-            _orderRepository.Add(order);
+            _orderRepository.Create(order);
         }
         else
         {

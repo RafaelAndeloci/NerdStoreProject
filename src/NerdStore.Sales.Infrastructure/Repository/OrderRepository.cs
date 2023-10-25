@@ -1,46 +1,68 @@
-﻿using NerdStore.Core.Data;
+﻿using Dapper;
+using NerdStore.Core.Data;
 using NerdStore.Sales.Domain;
+using NerdStore.Sales.Infrastructure.QueriesAndCommands;
 
 namespace NerdStore.Sales.Infrastructure.Repository;
 
 public class OrderRepository : IOrderRepository
 {
-    public SqlConnectionFactory SqlConnectionFactory { get; }
+    private SqlConnectionFactory SqlConnectionFactory { get; }
 
 
     public OrderRepository(SqlConnectionFactory sqlConnectionFactory)
     {
         SqlConnectionFactory = sqlConnectionFactory;
     }
-
-    public Task<Order> GetOrderByIdAsync(Guid id)
+    
+    public async Task<IEnumerable<Order>> GetOrdersByClientId(Guid clientId)
     {
-        throw new NotImplementedException();
+        await using var connection = SqlConnectionFactory.CreateConnection();
+        var gridReader = await connection.QueryMultipleAsync(
+            sql: OrderQueries.GetOrdersByClientQuery,
+            commandTimeout: 15);
+
+        var orders = await MultipleOrderMap(gridReader);
+
+        return orders;
     }
 
-    public Task<IEnumerable<Order>> OrdersByClientId(Guid clientId)
+    public async Task<Order?> GetSketchOrderByClientId(Guid clientId)
     {
-        throw new NotImplementedException();
+        await using var connection = SqlConnectionFactory.CreateConnection();
+        var gridReader = await connection.QueryMultipleAsync(
+            sql: OrderQueries.GetOrderSketchByClientIdQuery);
+
+        var sketchOrder = await SingleOrderMap(gridReader);
+        
+        return sketchOrder;
     }
 
-    public Task<Order?> GetSketchOrderByClientId(Guid clientId)
+    public async Task<IEnumerable<Order>> GetAll()
     {
-        throw new NotImplementedException();
+        await using var connection = SqlConnectionFactory.CreateConnection();
+        var gridReader = await connection.QueryMultipleAsync(
+            sql: OrderQueries.GetAllQuery,
+            commandTimeout: 15);
+
+        var orders = await MultipleOrderMap(gridReader);
+
+        return orders;
     }
 
-    public void Add(Order order)
-    {
-        throw new NotImplementedException();
-    }
+    
 
-    public Task<IEnumerable<Order>> GetAll()
+    public async Task<Order?> GetById(Guid id)
     {
-        throw new NotImplementedException();
-    }
+        await using var connection = SqlConnectionFactory.CreateConnection();
+        var gridReader = await connection.QueryMultipleAsync(
+            sql: OrderQueries.GetByIdQuery,
+            param: new { Id = id },
+            commandTimeout: 15);
 
-    public Task<Order?> GetById(Guid id)
-    {
-        throw new NotImplementedException();
+        var order = await SingleOrderMap(gridReader);
+
+        return order;
     }
 
     public void Create(Order entity)
@@ -83,10 +105,57 @@ public class OrderRepository : IOrderRepository
         throw new NotImplementedException();
     }
 
-    public Task<Voucher> GetVoucherByCode(string code)
+    public Task<IEnumerable<OrderItem>> GetItemsLinkedToOrder(Guid orderId)
     {
         throw new NotImplementedException();
     }
 
+    public Task<Voucher?> GetVoucherLinkedToOrder(Guid orderId)
+    {
+        throw new NotImplementedException();
+    }
 
+    public Task<Voucher?> GetVoucherByCode(string code)
+    {
+        throw new NotImplementedException();
+    }
+    
+    private async Task ApplyVoucherAndItemsInOrders(List<Order> orders)
+    {
+        foreach (var order in orders)
+        {
+            var itemsLinkedToThisOrder = await GetItemsLinkedToOrder(order.Id);
+            foreach (var item in itemsLinkedToThisOrder) order.AddItem(item);
+
+            var voucherLinkedToThisOrder = await GetVoucherLinkedToOrder(order.Id);
+            if (voucherLinkedToThisOrder is not null) order.ApplyVoucher(voucherLinkedToThisOrder);
+        }
+    }
+    
+    private async Task<IEnumerable<Order>> MultipleOrderMap(SqlMapper.GridReader gridReader)
+    {
+        await using var reader = gridReader;
+
+        var orders = await reader.ReadAsync<Order>();
+        var ordersList = orders.ToList();
+        
+        await ApplyVoucherAndItemsInOrders(ordersList);
+
+        return ordersList;
+    }
+
+    private static async Task<Order?> SingleOrderMap(SqlMapper.GridReader gridReader)
+    {
+        await using var reader = gridReader;
+
+        var order = await reader.ReadFirstAsync<Order>();
+        var voucher = await reader.ReadFirstAsync<Voucher?>();
+        var orderItems = await reader.ReadAsync<OrderItem>();
+
+        if (voucher is not null) order.ApplyVoucher(voucher);
+        
+        foreach (var orderItem in orderItems) order.AddItem(orderItem);
+
+        return order;
+    }
 }

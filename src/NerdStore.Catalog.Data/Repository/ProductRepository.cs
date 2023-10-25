@@ -146,8 +146,8 @@ public class ProductRepository : IProductRepository
 
         var product = await reader.ReadFirstAsync<Product>();
         var dimensions = await reader.ReadFirstAsync<Dimensions>();
-        product.ChangeDimensions(dimensions);
         product.ChangeCategory(await reader.ReadFirstAsync<Category>());
+        product.ChangeDimensions(dimensions);
         return product;
     }
     private static object GetParameters(Product entity)

@@ -9,5 +9,9 @@
     <ItemGroup>
         <ProjectReference Include="..\NerdStore.Sales.Domain\NerdStore.Sales.Domain.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Dapper" Version="2.1.15" />
+    </ItemGroup>
     
 </Project>
